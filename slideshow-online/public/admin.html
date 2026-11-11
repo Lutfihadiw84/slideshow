@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin Slideshow</title>
+<style>
+*{box-sizing:border-box}body{font-family:Arial,sans-serif;background:#f3f5f8;color:#172033;margin:0;padding:24px}
+.wrap{max-width:760px;margin:auto}.card{background:white;padding:24px;border-radius:16px;box-shadow:0 8px 28px #17203312;margin:16px 0}
+h1{margin-top:0}label{display:block;font-weight:600;margin:14px 0 6px}input,button{font:inherit;padding:12px;border-radius:9px;border:1px solid #ccd3df;width:100%}
+button{background:#174ea6;color:white;border:0;font-weight:700;cursor:pointer;margin-top:16px}button.secondary{background:#e8edf5;color:#172033}
+small,.muted{color:#647084}.row{display:grid;grid-template-columns:1fr 1fr;gap:14px}.hidden{display:none}.status{margin-top:12px;padding:12px;border-radius:8px;background:#edf4ff;white-space:pre-wrap}
+a{color:#174ea6}@media(max-width:560px){body{padding:12px}.row{grid-template-columns:1fr}}
+</style></head>
+<body><main class="wrap">
+<h1>Admin Slideshow Online</h1>
+<p class="muted">Kelola file yang akan ditampilkan pada halaman publik.</p>
+<section class="card" id="loginBox">
+<h2>Login Admin</h2><label>Password admin</label><input id="password" type="password" placeholder="Masukkan password admin">
+<button id="loginBtn">Login</button><div class="status" id="loginMsg"></div>
+</section>
+<section class="card hidden" id="panel">
+<h2>Pengaturan Presentasi</h2>
+<form id="form">
+<label>Judul presentasi</label><input name="title" value="Presentasi Publik" maxlength="100">
+<div class="row">
+<div><label>Durasi per slide (detik)</label><input name="interval" type="number" min="2" max="120" value="7"></div>
+<div><label>File presentasi</label><input name="files" type="file" multiple accept=".pptx,.pdf,.jpg,.jpeg,.png,.webp"></div>
+</div>
+<label><input name="loop" type="checkbox" checked style="width:auto"> Ulangi dari slide pertama setelah slide terakhir (loop)</label>
+<small>Format: PPTX, PDF, JPG, PNG, WEBP. Maksimal 100 MB per file. Jika memilih beberapa gambar, urutkan nama file sesuai urutan slide.</small>
+<button type="submit">Simpan & Publikasikan</button>
+</form>
+<div class="status" id="uploadMsg">Halaman publik: <a href="/slide" target="_blank">Buka slideshow</a></div>
+<button class="secondary" id="logoutBtn">Logout</button>
+</section>
+</main>
+<script>
+const $=s=>document.querySelector(s);
+async function refresh(){
+ const r=await fetch('/api/admin/status');const d=await r.json();
+ $('#loginBox').classList.toggle('hidden',d.loggedIn);$('#panel').classList.toggle('hidden',!d.loggedIn);
+}
+$('#loginBtn').onclick=async()=>{
+ const r=await fetch('/api/admin/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:$('#password').value})});
+ const d=await r.json();$('#loginMsg').textContent=d.error||'Login berhasil.';if(r.ok)refresh();
+};
+$('#form').onsubmit=async e=>{
+ e.preventDefault();const fd=new FormData(e.target);
+ if(!fd.getAll('files').some(f=>f.size>0)){ $('#uploadMsg').textContent='Pilih file presentasi terlebih dahulu.';return; }
+ fd.set('loop',e.target.loop.checked?'true':'false');
+ $('#uploadMsg').textContent='Sedang mengunggah dan memproses file...';
+ try{const r=await fetch('/api/admin/presentation',{method:'POST',body:fd});const d=await r.json();$('#uploadMsg').textContent=r.ok?`Berhasil! ${d.count} file/slide disimpan. Halaman publik: /slide`:d.error;}
+ catch(err){$('#uploadMsg').textContent='Gagal: '+err.message;}
+};
+$('#logoutBtn').onclick=async()=>{await fetch('/api/admin/logout',{method:'POST'});refresh();};
+refresh();
+</script></body></html>

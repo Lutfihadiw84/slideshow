@@ -1,0 +1,16 @@
+{
+  "name": "slideshow-online",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Aplikasi slideshow online looping dengan halaman admin dan publik",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "express-session": "^1.18.1",
+    "multer": "^1.4.5-lts.1",
+    "dotenv": "^16.4.7"
+  }
+}

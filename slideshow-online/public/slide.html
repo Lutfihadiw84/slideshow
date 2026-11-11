@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Slideshow Publik</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;background:#080a0f;color:#fff;font-family:Arial,sans-serif;overflow:hidden}
+#stage{width:100%;height:100%;display:flex;align-items:center;justify-content:center}
+#stage img,#pdfCanvas{max-width:100%;max-height:100%;object-fit:contain}
+#empty{padding:24px;text-align:center;color:#c8ced8}.bar{position:absolute;left:0;right:0;bottom:0;display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:linear-gradient(transparent,#000b);opacity:0;transition:opacity .2s}
+body:hover .bar,body:focus-within .bar{opacity:1}.bar button{border:1px solid #ffffff55;background:#151922cc;color:white;border-radius:8px;padding:8px 12px;cursor:pointer}
+#counter{font-size:13px;color:#ddd}.error{color:#ffb4b4}
+</style>
+</head><body><main id="stage"><div id="empty">Memuat presentasi...</div></main>
+<div class="bar"><div><button id="prev">◀ Sebelumnya</button> <button id="next">Berikutnya ▶</button> <button id="toggle">Jeda</button> <button id="full">Layar penuh</button></div><div id="counter"></div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+if(window.pdfjsLib)pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+const stage=document.getElementById('stage'),counter=document.getElementById('counter');
+let presentation=null,items=[],index=0,page=1,timer=null,paused=false;
+function clearTimer(){if(timer){clearInterval(timer);timer=null;}}
+function currentCount(){return items.length;}
+async function render(){
+ if(!items.length){stage.innerHTML='<div id="empty">Belum ada presentasi yang dipublikasikan.</div>';counter.textContent='';return;}
+ const item=items[index];stage.innerHTML='';
+ if(item.type==='image'){
+   const img=document.createElement('img');img.src=item.url;img.alt=item.name;stage.appendChild(img);
+   counter.textContent=`${index+1} / ${items.length}`;
+ }else{
+   try{
+     const pdf=await pdfjsLib.getDocument(item.url).promise;
+     if(page>pdf.numPages){page=1;index=(index+1)%items.length;return render();}
+     const p=await pdf.getPage(page);const viewport=p.getViewport({scale:1});
+     const scale=Math.min((innerWidth-20)/viewport.width,(innerHeight-20)/viewport.height);
+     const scaled=p.getViewport({scale:Math.max(.1,scale)});
+     const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');
+     canvas.width=scaled.width;canvas.height=scaled.height;canvas.id='pdfCanvas';stage.appendChild(canvas);
+     await p.render({canvasContext:ctx,viewport:scaled}).promise;
+     counter.textContent=`${index+1} / ${items.length} • halaman ${page} dari ${pdf.numPages}`;
+     item._pages=pdf.numPages;
+   }catch(e){stage.innerHTML='<div id="empty" class="error">Gagal menampilkan PDF. Periksa file atau koneksi internet.</div>';counter.textContent='';}
+ }
+}
+async function advance(){
+ if(!items.length)return;
+ const item=items[index];
+ if(item.type==='pdf' && item._pages && page<item._pages){page++;await render();return;}
+ page=1;index++;
+ if(index>=items.length){index=presentation.loop?0:items.length-1;if(!presentation.loop){paused=true;clearTimer();document.getElementById('toggle').textContent='Putar';}}
+ await render();
+}
+function start(){clearTimer();if(!paused&&items.length)timer=setInterval(advance,Math.max(2,Number(presentation.interval)||7)*1000);}
+async function load(){
+ try{
+ const r=await fetch('/api/presentation');presentation=await r.json();items=presentation.slides||[];
+ if(!items.length){render();return;}
+ await render();start();
+ }catch(e){stage.innerHTML='<div id="empty">Tidak dapat memuat presentasi. Coba muat ulang halaman.</div>';}
+}
+document.getElementById('prev').onclick=async()=>{paused=true;clearTimer();document.getElementById('toggle').textContent='Putar';if(items.length){index=(index-1+items.length)%items.length;page=1;await render();}};
+document.getElementById('next').onclick=async()=>{paused=true;clearTimer();document.getElementById('toggle').textContent='Putar';await advance();};
+document.getElementById('toggle').onclick=()=>{paused=!paused;document.getElementById('toggle').textContent=paused?'Putar':'Jeda';start();};
+document.getElementById('full').onclick=()=>{if(!document.fullscreenElement)document.documentElement.requestFullscreen?.();else document.exitFullscreen?.();};
+window.addEventListener('resize',()=>{if(items.length)render();});
+load();
+</script></body></html>
